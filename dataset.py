@@ -17,7 +17,6 @@ def create_dataloader_v1(
     return dataloader
 
 
-
 class GPTDatasetV1(Dataset):
 
     def __init__(self, text, tokenizer, max_length, stride):

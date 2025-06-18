@@ -1,14 +1,35 @@
-import re
 from tokenizer import SimpleTokenizerV1, SimpleTokenizerV2
-import tiktoken
 from dataset import create_dataloader_v1
+import embedding
+import tiktoken
+import re
 
 """
     Tiktoken docs: https://pypi.org/project/tiktoken/
 """
 
 
-def main():
+def token_embedding_with_abs_pos():
+    raw_text = load_text()
+    tokenizer = tiktoken.get_encoding("gpt2")
+
+    dataloader = create_dataloader_v1(raw_text, tokenizer, batch_size=8, max_length=4, stride=4, shuffle=False)
+    data_iter = iter(dataloader)
+    inputs, targets = next(data_iter)
+    print(f"Token IDS:\n{inputs}")
+    print(f"Inputs Shape:\n{inputs.shape}\n")
+
+    token_embedding_layer = embedding.get_bpe_embedding_layer(vocab_size=50257, output_dim=256)
+    token_embeddings = token_embedding_layer(inputs)
+    print(token_embeddings.shape, '\n')
+    pos_embeddings = embedding.get_abs_embedding_layer(context_length=4, output_dim=256)
+
+    input_embeddings = token_embeddings + pos_embeddings
+    print(input_embeddings.shape)
+
+
+
+def first_token_embedding():
     raw_text = load_text()
     tokenizer = tiktoken.get_encoding("gpt2")
 
