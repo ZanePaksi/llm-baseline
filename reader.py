@@ -8,6 +8,10 @@ import re
     Tiktoken docs: https://pypi.org/project/tiktoken/
 """
 
+def main():
+    # Ending at section 3.3
+    pass
+
 
 def token_embedding_with_abs_pos():
     raw_text = load_text()
