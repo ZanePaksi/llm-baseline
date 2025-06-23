@@ -1,4 +1,6 @@
 import torch
+import tiktoken
+from torch.utils.backcompat import keepdim_warning
 
 GPT_CONFIG_124M = {
     "vocab_size": 50257,     # refers to a vocabulary of 50,257 words, as used by the BPE tokenizer
@@ -14,7 +16,7 @@ GPT_CONFIG_124M = {
 class DummyGPTModel(torch.nn.Module):
 
     def __init__(self, config):
-        super().__init_()
+        super().__init__()
         self.tok_emb = torch.nn.Embedding(config['vocab_size'], config['emb_dim'])
         self.pos_emb = torch.nn.Embedding(config['context_length'], config['emb_dim'])
         self.drop_emb = torch.nn.Dropout(config['drop_rate'])
@@ -52,4 +54,72 @@ class DummyLayerNorm(torch.nn.Module):
     def forward(self, x):
         return x
 
-# ending before figure 4.1
+def gpt2_start_batch():
+    tokenizer = tiktoken.get_encoding("gpt2")
+    batch = []
+    txt1 = "Every effort moves you"
+    txt2 = "Every day holds a"
+
+    batch.append(torch.tensor(tokenizer.encode(txt1)))
+    batch.append(torch.tensor(tokenizer.encode(txt2)))
+    batch = torch.stack(batch, dim=0)
+    print(batch)
+
+    torch.manual_seed(123)
+    model = DummyGPTModel(GPT_CONFIG_124M)
+    logits = model(batch)
+    print(f"{logits.shape=}")
+    print(f"{logits}")
+
+
+def layer_norm_example():
+    torch.manual_seed(123)
+    batch = torch.randn(2, 5)
+    layer = torch.nn.Sequential(torch.nn.Linear(5, 6), torch.nn.ReLU())
+    out = layer(batch)
+    print(out)
+
+    mean = out.mean(dim=-1, keepdim=True)
+    var = out.var(dim=-1, keepdim=True)
+    print(f"{mean=}")
+    print(f"{var=}")
+
+    out_norm = (out - mean) / torch.sqrt(var)
+    mean = out_norm.mean(dim=-1, keepdim=True)
+    var = out_norm.var(dim=-1, keepdim=True)
+    print(f"\nNormalized Outputs\n{out_norm}")
+    print(f"Mean: {mean}")
+    print(f"Variance: {var}")
+
+    torch.set_printoptions(sci_mode=False)
+    print("Mean:\n", mean)
+    print("Variance:\n", var)
+
+class LayerNorm(torch.nn.Module):
+
+    def __init__(self, emb_dim):
+        super().__init__()
+        self.eps = 1e-5
+        self.scale = torch.nn.Parameter(torch.ones(emb_dim))
+        self.shift = torch.nn.Parameter(torch.zeros(emb_dim))
+
+    def forward(self, input_tensor):
+        mean = input_tensor.mean(dim=-1, keepdim=True)
+        var = input_tensor.var(dim=-1, keepdim=True, unbiased=False)
+        norm = (input_tensor - mean) / torch.sqrt(var + self.eps)
+        return self.scale * norm + self.shift
+
+
+def layer_norm_implementation():
+    torch.set_printoptions(sci_mode=False)
+    torch.manual_seed(123)
+    batch = torch.randn(2, 5)
+    ln = LayerNorm(emb_dim=5)
+    out_ln = ln(batch)
+    mean = out_ln.mean(dim=-1, keepdim=True)
+    var = out_ln.var(dim=-1, keepdim=True, unbiased=False)
+    print(f"{mean=}")
+    print(f"{var=}")
+
+# Ending at 4.3
+layer_norm_implementation()
