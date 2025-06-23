@@ -173,7 +173,7 @@ def try_SelfAttentionV2():
     return sa_v2
 
 
-def casual_attention_start():
+def causal_attention_start():
     sa_v2 = try_SelfAttentionV2()
     queries = sa_v2.w_query(inputs)
     keys = sa_v2.w_key(inputs)
@@ -206,14 +206,14 @@ def casual_attention_start():
     print(dropout(attn_weights))
 
 
-def casual_attention_dropout_example():
+def causal_attention_dropout_example():
     torch.manual_seed(123)
     dropout = torch.nn.Dropout(0.5)
     example = torch.ones(6, 6)
     print(dropout(example))
 
 
-class CasualAttention(torch.nn.Module):
+class CausalAttention(torch.nn.Module):
 
     def __init__(self, d_in, d_out, context_length, dropout, qkv_bias=False):
         super().__init__()
@@ -239,16 +239,106 @@ class CasualAttention(torch.nn.Module):
         return context_vec
 
 
-def casual_attention_implementation():
+def causal_attention_implementation():
     d_in = inputs.shape[1]
     d_out = 2
     batch = torch.stack((inputs, inputs), dim=0)
     torch.manual_seed(123)
     context_length = batch.shape[1]
-    ca = CasualAttention(d_in, d_out, context_length, 0.0)
+    ca = CausalAttention(d_in, d_out, context_length, 0.0)
     context_vecs = ca(batch)
     print("context_vecs.shape:", context_vecs.shape)
 
-casual_attention_implementation()
 
-# wrapping up at 3.6
+class MultiHeadAttentionWrapper(torch.nn.Module):
+
+    def __init__(self, d_in, d_out, context_length, dropout, num_heads, qkv_bias=False):
+        super().__init__()
+        self.heads = torch.nn.ModuleList(
+            [CausalAttention(d_in, d_out, context_length, dropout, qkv_bias) for _ in range(num_heads)]
+        )
+
+    def forward(self, embedded_tokens):
+        return torch.cat([head(embedded_tokens) for head in self.heads], dim=-1)
+
+
+def multi_head_wrapper():
+    batch = torch.stack((inputs, inputs), dim=0)
+    torch.manual_seed(123)
+    context_length = batch.shape[1]
+    d_in, d_out = 3, 2
+    mha = MultiHeadAttentionWrapper(d_in, d_out, context_length, 0.0, num_heads=2)
+    context_vecs = mha(batch)
+
+    print(context_vecs)
+    print(f"{context_vecs.shape=}")
+
+
+class MultiHeadAttention(torch.nn.Module):
+
+    def __init__(self, d_in, d_out, context_length, dropout, num_heads, qkv_bias=False):
+        super().__init__()
+        assert (d_out % num_heads == 0), "d_out must be divisible by num_heads"
+
+        self.d_out = d_out
+        self.num_heads = num_heads
+        self.head_dim = d_out // num_heads
+        self.w_query = torch.nn.Linear(d_in, d_out, bias=qkv_bias)
+        self.w_key = torch.nn.Linear(d_in, d_out, bias=qkv_bias)
+        self.w_value = torch.nn.Linear(d_in, d_out, bias=qkv_bias)
+        self.out_proj = torch.nn.Linear(d_out, d_out)
+        self.dropout = torch.nn.Dropout(dropout)
+        self.register_buffer("mask", torch.triu(torch.ones(context_length, context_length), diagonal=1))
+
+    def forward(self, embedded_tokens):
+        b, num_tokens, d_in = embedded_tokens.shape
+
+        keys = self.w_key(embedded_tokens)
+        queries = self.w_query(embedded_tokens)
+        values = self.w_value(embedded_tokens)
+
+        keys = keys.view(b, num_tokens, self.num_heads, self.head_dim)
+        values = values.view(b, num_tokens, self.num_heads, self.head_dim)
+        queries = queries.view(b, num_tokens, self.num_heads, self.head_dim)
+
+        keys = keys.transpose(1, 2)
+        queries = queries.transpose(1, 2)
+        values = values.transpose(1, 2)
+
+        attn_scores = queries @ keys.transpose(2, 3)
+        mask_bool = self.mask.bool()[:num_tokens, :num_tokens]
+
+        # set the dropout values to negative infinity
+        attn_scores.masked_fill_(mask_bool, -torch.inf)
+
+        # normalize attention tensor with softmax
+        attn_weights = torch.softmax(attn_scores / keys.shape[-1]**0.5, dim=-1)
+        attn_weights = self.dropout(attn_weights)
+
+        context_vec = (attn_weights @ values).transpose(1, 2)
+        context_vec = context_vec.contiguous().view(b, num_tokens, self.d_out)
+        context_vec = self.out_proj(context_vec)
+
+        return context_vec
+
+
+def multi_head_implementation():
+    batch = torch.stack((inputs, inputs), dim=0)
+    torch.manual_seed(123)
+    batch_size, context_length, d_in = batch.shape
+    d_out = 2
+    mha = MultiHeadAttention(d_in, d_out, context_length, 0.0, num_heads=2)
+    context_vecs = mha(batch)
+
+    print(context_vecs)
+    print(f"{context_vecs.shape=}")
+
+
+def gpt2_initialization():
+    """
+        These are the specs for the gpt2 model.
+    """
+    context_length = 1024
+    d_in, d_out = 768, 768
+    num_heads = 12
+    mha = MultiHeadAttention(d_in, d_out, context_length, 0.0, num_heads)
