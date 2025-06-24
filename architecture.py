@@ -1,6 +1,7 @@
 import torch
 import tiktoken
 from torch.utils.backcompat import keepdim_warning
+import matplotlib.pyplot as plt
 
 GPT_CONFIG_124M = {
     "vocab_size": 50257,     # refers to a vocabulary of 50,257 words, as used by the BPE tokenizer
@@ -54,6 +55,7 @@ class DummyLayerNorm(torch.nn.Module):
     def forward(self, x):
         return x
 
+
 def gpt2_start_batch():
     tokenizer = tiktoken.get_encoding("gpt2")
     batch = []
@@ -95,6 +97,7 @@ def layer_norm_example():
     print("Mean:\n", mean)
     print("Variance:\n", var)
 
+
 class LayerNorm(torch.nn.Module):
 
     def __init__(self, emb_dim):
@@ -103,10 +106,10 @@ class LayerNorm(torch.nn.Module):
         self.scale = torch.nn.Parameter(torch.ones(emb_dim))
         self.shift = torch.nn.Parameter(torch.zeros(emb_dim))
 
-    def forward(self, input_tensor):
-        mean = input_tensor.mean(dim=-1, keepdim=True)
-        var = input_tensor.var(dim=-1, keepdim=True, unbiased=False)
-        norm = (input_tensor - mean) / torch.sqrt(var + self.eps)
+    def forward(self, embedded_tokens):
+        mean = embedded_tokens.mean(dim=-1, keepdim=True)
+        var = embedded_tokens.var(dim=-1, keepdim=True, unbiased=False)
+        norm = (embedded_tokens - mean) / torch.sqrt(var + self.eps)
         return self.scale * norm + self.shift
 
 
@@ -121,5 +124,54 @@ def layer_norm_implementation():
     print(f"{mean=}")
     print(f"{var=}")
 
-# Ending at 4.3
-layer_norm_implementation()
+# 4.3 GELU
+
+class GELU(torch.nn.Module):
+
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, embedded_tokens):
+        return 0.5 * embedded_tokens * (1 + torch.tanh(torch.sqrt(torch.tensor(2.0 / torch.pi)) *
+                                                       (embedded_tokens + 0.044715 * torch.pow(embedded_tokens, 3))))
+
+
+def gelu_relu_comp():
+    gelu, relu = GELU(), torch.nn.ReLU()
+
+    x = torch.linspace(-3, 3, 100)
+    y_gelu, y_relu = gelu(x), relu(x)
+    plt.figure(figsize=(8, 3))
+
+    for i, (y, label) in enumerate(zip([y_gelu, y_relu], ["GELU", "RELU"]), 1):
+        plt.subplot(1, 2, i)
+        plt.plot(x, y)
+        plt.title(f"{label} activation function")
+        plt.xlabel("x")
+        plt.ylabel(f"{label}(x)")
+        plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+
+class FeedForward(torch.nn.Module):
+
+    def __init__(self, config):
+        super().__init__()
+        self.layers = torch.nn.Sequential(
+            torch.nn.Linear(config['emb_dim'], 4 * config['emb_dim']),
+            GELU(),
+            torch.nn.Linear(4 * config['emb_dim'], config['emb_dim'])
+        )
+
+    def forward(self, embedded_tokens):
+        return self.layers(embedded_tokens)
+
+
+def feed_fwd():
+    ffn = FeedForward(GPT_CONFIG_124M)
+    x = torch.rand(2, 3, 768)
+    out = ffn(x)
+    print(out.shape)
+
+# Stopping at 4.4
