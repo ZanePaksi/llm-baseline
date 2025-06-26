@@ -106,10 +106,10 @@ class LayerNorm(torch.nn.Module):
         self.scale = torch.nn.Parameter(torch.ones(emb_dim))
         self.shift = torch.nn.Parameter(torch.zeros(emb_dim))
 
-    def forward(self, embedded_tokens):
-        mean = embedded_tokens.mean(dim=-1, keepdim=True)
-        var = embedded_tokens.var(dim=-1, keepdim=True, unbiased=False)
-        norm = (embedded_tokens - mean) / torch.sqrt(var + self.eps)
+    def forward(self, input_tensor):
+        mean = input_tensor.mean(dim=-1, keepdim=True)
+        var = input_tensor.var(dim=-1, keepdim=True, unbiased=False)
+        norm = (input_tensor - mean) / torch.sqrt(var + self.eps)
         return self.scale * norm + self.shift
 
 
@@ -131,9 +131,9 @@ class GELU(torch.nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, embedded_tokens):
-        return 0.5 * embedded_tokens * (1 + torch.tanh(torch.sqrt(torch.tensor(2.0 / torch.pi)) *
-                                                       (embedded_tokens + 0.044715 * torch.pow(embedded_tokens, 3))))
+    def forward(self, input_tensor):
+        return 0.5 * input_tensor * (1 + torch.tanh(torch.sqrt(torch.tensor(2.0 / torch.pi)) *
+                                                       (input_tensor + 0.044715 * torch.pow(input_tensor, 3))))
 
 
 def gelu_relu_comp():
@@ -164,8 +164,8 @@ class FeedForward(torch.nn.Module):
             torch.nn.Linear(4 * config['emb_dim'], config['emb_dim'])
         )
 
-    def forward(self, embedded_tokens):
-        return self.layers(embedded_tokens)
+    def forward(self, input_tensor):
+        return self.layers(input_tensor)
 
 
 def feed_fwd():
@@ -175,3 +175,56 @@ def feed_fwd():
     print(out.shape)
 
 # Stopping at 4.4
+
+class ExampleDeepNeuralNetwork(torch.nn.Module):
+
+    def __init__(self, layer_sizes, use_shortcut):
+        super().__init__()
+        self.use_shortcut = use_shortcut
+        self.layers = torch.nn.ModuleList([
+            torch.nn.Sequential(torch.nn.Linear(layer_sizes[0], layer_sizes[1]), GELU()),
+            torch.nn.Sequential(torch.nn.Linear(layer_sizes[1], layer_sizes[2]), GELU()),
+            torch.nn.Sequential(torch.nn.Linear(layer_sizes[2], layer_sizes[3]), GELU()),
+            torch.nn.Sequential(torch.nn.Linear(layer_sizes[3], layer_sizes[4]), GELU()),
+            torch.nn.Sequential(torch.nn.Linear(layer_sizes[4], layer_sizes[5]), GELU())
+        ])
+
+    def forward(self, input_tensor):
+        for layer in self.layers:
+            layer_output = layer(input_tensor)
+            if self.use_shortcut and input_tensor.shape == layer_output.shape:
+                input_tensor = input_tensor + layer_output
+            else:
+                input_tensor = layer_output
+        return input_tensor
+
+
+def print_gradients(model, input_tensor):
+    output = model(input_tensor)
+    target = torch.tensor([[0.]])
+
+    loss = torch.nn.MSELoss()
+    loss = loss(output, target)
+
+    loss.backward()
+
+    for name, param in model.named_parameters():
+        if 'weight' in name:
+            print(f"{name} has gradient mean of {param.grad.abs().mean().item()}")
+
+
+def deep_neural_test():
+    layer_sizes = [3, 3, 3, 3, 3, 1]
+    sample_input = torch.tensor([[1., 0., -1.]])
+    torch.manual_seed(123)
+    model_without_shortcut = ExampleDeepNeuralNetwork(layer_sizes, use_shortcut=False)
+    print_gradients(model_without_shortcut, sample_input)
+    print()
+
+    torch.manual_seed(123)
+    model_with_shortcut = ExampleDeepNeuralNetwork(layer_sizes, use_shortcut=True)
+    print_gradients(model_with_shortcut, sample_input)
+
+
+
+
