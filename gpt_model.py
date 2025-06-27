@@ -114,5 +114,20 @@ def generate_text_simple(model, token_ids, max_new_tokens, context_size):
     return token_ids
 
 
+def chat():
+    tokenizer = tiktoken.get_encoding("gpt2")
+    model = GPTModel(GPT_CONFIG_124M)
+    model.eval()
 
-try_gpt_model_z()
+    while usr_input := str(input(":> ")):
+        encoded = tokenizer.encode(usr_input)
+        encoded_tensor = torch.tensor(encoded).unsqueeze(0)
+        out = generate_text_simple(
+            model=model,
+            token_ids=encoded_tensor,
+            max_new_tokens=10,
+            context_size=GPT_CONFIG_124M['context_length']
+        )
+        decoded_text = tokenizer.decode(out.squeeze(0).tolist())
+        print(decoded_text)
+        print('-' * 40)

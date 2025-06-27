@@ -1,3 +1,7 @@
+"""
+    Chapter 4
+"""
+
 import torch
 import tiktoken
 from torch.utils.backcompat import keepdim_warning
