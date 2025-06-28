@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 GPT_CONFIG_124M = {
     "vocab_size": 50257,     # refers to a vocabulary of 50,257 words, as used by the BPE tokenizer
-    "context_length": 1024,  # maximum number of input tokens the model can handle via the positional embeddings
+    "context_length": 256,  # maximum number of input tokens the model can handle via the positional embeddings
     "emb_dim": 768,          # represents the embedding size, transforming each token into a 768-dimensional vector.
     "n_heads": 12,           # indicates the count of attention heads in the multi-head attention mechanism
     "n_layers": 12,          # specifies the number of transformer blocks in the model
