@@ -61,6 +61,33 @@ def text_gen_loss():
     print(f"Outputs batch 1:"
           f" {token_ids_to_text(token_ids[0].flatten(), tokenizer)}")
 
+    text_token = 0
+    target_probas_1 = probas[text_token, [0, 1, 2], targets[text_token]]
+    print("Text 1:", target_probas_1)
+
+    text_token = 1
+    target_probas_2 = probas[text_token, [0, 1, 2], targets[text_token]]
+    print("Text 2:", target_probas_1)
+
+    log_probas = torch.log(torch.cat((target_probas_1, target_probas_2)))
+    print(log_probas)
+
+    avg_log_probas = torch.mean(log_probas)
+    print(avg_log_probas)
+
+    # turnning the negative mean of probabilities to positive is known as 'cross entropy loss'
+    neg_avg_log_probas = avg_log_probas * -1
+    print(neg_avg_log_probas)
+
+    print('\n\n')
+    # prepping to avoid all the loss calculations in replacement for the pytorch cross_entropy function
+    logits_flat = logits.flatten(0, 1)
+    targets_flat = targets.flatten()
+    print("Flattened logits:", logits_flat.shape)
+    print("Flattened targets:", targets_flat.shape)
+    loss = torch.nn.functional.cross_entropy(logits_flat, targets_flat)
+    print(loss)
+    # see that loss is calculated the same as neg_avg_log_probas?
 
 text_gen_loss()
 

@@ -131,3 +131,4 @@ def chat():
         decoded_text = tokenizer.decode(out.squeeze(0).tolist())
         print(decoded_text)
         print('-' * 40)
+
