@@ -147,10 +147,6 @@ def training_data_and_loss():
         train_loss = calc_loss_loader(train_loader, model, device)
         val_loss = calc_loss_loader(val_loader, model, device)
 
-    print("Training loss:", train_loss)
-    print("Validation loss:", val_loss)
-
-
 
 def calc_loss_batch(input_batch, target_batch, model, device):
     input_batch = input_batch.to(device)

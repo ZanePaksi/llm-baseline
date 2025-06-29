@@ -114,6 +114,59 @@ def generate_text_simple(model, token_ids, max_new_tokens, context_size):
     return token_ids
 
 
+def generate_text_mutlinomial(model, token_ids, max_new_tokens, context_size):
+    for _ in range(max_new_tokens):
+        token_ids_crop = token_ids[:, -context_size:]
+        with torch.no_grad():
+            logits = model(token_ids_crop)
+
+        logits = logits[:, -1, :]
+        probabilities = torch.softmax(logits, dim=-1)
+        next_token_id = torch.multinomial(probabilities, num_samples=1)
+        token_ids = torch.cat((token_ids, next_token_id), dim=1)
+
+    return token_ids
+
+
+def multinomial_probas_example():
+    vocab = {
+        "closer": 0,
+        "every": 1,
+        "effort": 2,
+        "forward": 3,
+        "inches": 4,
+        "moves": 5,
+        "pizza": 6,
+        "toward": 7,
+        "you": 8,
+    }
+    inverse_vocab = {v: k for k, v in vocab.items()}
+    next_token_logits = torch.tensor(
+        [4.51, 0.89, -1.90, 6.75, 1.63, -1.62, -1.89, 6.28, 1.79]
+    )
+    probas = torch.softmax(next_token_logits, dim=0)
+    next_token_id = torch.argmax(probas).item()
+    print(inverse_vocab[next_token_id])
+
+    torch.manual_seed(123)
+    next_token_id = torch.multinomial(probas, num_samples=1).item()
+    print(inverse_vocab[next_token_id])
+
+    torch.manual_seed(123)
+    sample = [torch.multinomial(probas, num_samples=1).item()
+              for i in range(1_000)]
+    sampled_ids = torch.bincount(torch.tensor(sample))
+    for i, freq in enumerate(sampled_ids):
+        print(f"{freq} x {inverse_vocab[i]}")
+
+
+multinomial_probas_example()
+
+# TODO: Important func here and above with multinomial
+def softmax_with_temperature(logits, temperature):
+    scaled_logits = logits / temperature
+    return torch.softmax(scaled_logits, dim=0)
+
 def chat():
     tokenizer = tiktoken.get_encoding("gpt2")
     model = GPTModel(GPT_CONFIG_124M)
