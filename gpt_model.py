@@ -127,7 +127,8 @@ def generate_text_mutlinomial(model, token_ids, max_new_tokens, context_size):
 
     return token_ids
 
-
+# TODO: Important function for variance in next-token selection
+# This function closely resembles print_sampled_tokens in section 5.3.1
 def multinomial_probas_example():
     vocab = {
         "closer": 0,
@@ -159,8 +160,6 @@ def multinomial_probas_example():
     for i, freq in enumerate(sampled_ids):
         print(f"{freq} x {inverse_vocab[i]}")
 
-
-multinomial_probas_example()
 
 # TODO: Important func here and above with multinomial
 def softmax_with_temperature(logits, temperature):

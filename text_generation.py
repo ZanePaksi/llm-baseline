@@ -90,6 +90,17 @@ def text_gen_loss():
     print(loss)
     # see that loss is calculated the same as neg_avg_log_probas?
 
+    """
+        Perplexity is a measure often used alongside cross entropy loss to evaluate the performance of models in 
+        tasks like language modeling. It can provide a more interpretable way to understand the uncertainty of a model 
+        in predicting the next token in a sequence. 
+        
+        Perplexity can be calculated as 
+            perplexity = torch.exp(loss)
+             
+        which returns tensor(48725.8203) when applied to the previously calculated loss. 
+    """
+
 
 def training_data_and_loss():
     tokenizer = tiktoken.get_encoding('gpt2')
@@ -174,4 +185,3 @@ def calc_loss_loader(data_loader, model, device, num_batches=None):
     return total_loss / num_batches
 
 
-training_data_and_loss()
