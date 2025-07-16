@@ -4,6 +4,7 @@ import torch.nn.modules.sparse
 from torch.nn import Embedding, Dropout, Sequential, Linear
 
 from architecture import LayerNorm, GPT_CONFIG_124M
+from valuable_funcs import text_to_token_ids, token_ids_to_text
 from transformer import TransformerBlock
 
 
@@ -127,6 +128,40 @@ def generate_text_mutlinomial(model, token_ids, max_new_tokens, context_size):
 
     return token_ids
 
+
+def generate_text_advanced(model, token_ids, max_new_tokens, context_size, temperature=0.0, top_k=None, eos_id=None):
+    """
+        This function adds temperature scaling and top-k sampling into the text generation. This looks like it also
+        includes the multinomial text generation methods as well
+    """
+    for _ in range(max_new_tokens):
+        token_ids_crop = token_ids[:, -context_size:]
+        with torch.no_grad():
+            logits: torch.Tensor = model(token_ids_crop)
+        logits = logits[:, -1, :]
+
+        if top_k:
+            top_logits, _ = torch.topk(logits, top_k)
+            min_val = top_logits[:, -1]
+            logits = torch.where(
+                condition=logits < min_val,
+                input=torch.tensor(float('-inf')).to(logits.device),
+                other=logits
+            )
+        if temperature > 0.0:
+            logits = logits / temperature
+            probabilities = torch.softmax(logits, dim=-1)
+            next_token_ids = torch.multinomial(probabilities, num_samples=1)
+        else:
+            next_token_ids = torch.argmax(logits, dim=-1, keepdim=True)
+
+        if next_token_ids == eos_id:
+            break
+
+        token_ids = torch.cat((token_ids, next_token_ids), dim=1)
+    return token_ids
+
+
 # TODO: Important function for variance in next-token selection
 # This function closely resembles print_sampled_tokens in section 5.3.1
 def multinomial_probas_example():
@@ -184,3 +219,30 @@ def chat():
         print(decoded_text)
         print('-' * 40)
 
+
+def test_advanced_text_gen():
+    torch.manual_seed(123)
+    model = GPTModel(GPT_CONFIG_124M)
+    tokenizer = tiktoken.get_encoding("gpt2")
+
+    token_ids = generate_text_advanced(
+        model=model,
+        token_ids=text_to_token_ids("Every effort moves you", tokenizer),
+        max_new_tokens=15,
+        context_size=GPT_CONFIG_124M['context_length'],
+        top_k=25,
+        temperature=1.4
+    )
+    print("Output text:\n", token_ids_to_text(token_ids, tokenizer))
+
+
+def save_model(model, optimizer, file_name):
+    file_name = f"{file_name}.pth"
+    torch.save(
+        {
+            "model_state": model.state_dict(),
+            "optimizer_state": optimizer.state_dict()
+        }, file_name
+    )
+
+# Ending just before exercise 5.4

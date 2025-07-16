@@ -4,7 +4,8 @@
 
 import tiktoken
 import torch
-from gpt_model import GPTModel, generate_text_simple, GPT_CONFIG_124M
+from gpt_model import GPTModel, generate_text_simple
+from architecture import GPT_CONFIG_124M
 from dataset import create_dataloader_v1
 
 
