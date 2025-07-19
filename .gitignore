@@ -1,6 +1,8 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 
+*.pth
+
 # Distribution / packaging
 .Python
 build/

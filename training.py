@@ -119,6 +119,8 @@ def test_training():
 
     decoding_strategies(model, tokenizer)
 
+    torch.save(model.state_dict(), "model.pth")
+
 
 # 5.3
 def decoding_strategies(model, tokenizer):
@@ -156,4 +158,4 @@ def topk_sampling():
 
 
 
-topk_sampling()
+test_training()
