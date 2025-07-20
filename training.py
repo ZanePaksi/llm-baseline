@@ -3,7 +3,6 @@
 """
 import tiktoken
 import torch
-from PIL.PdfParser import encode_text
 from torch import Tensor
 
 from architecture import GPT_CONFIG_124M

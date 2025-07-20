@@ -10,12 +10,12 @@
         - Perhaps some way of measurement, but that may be part of training.
 """
 
-import torch
-
+from hujo import torch
+from hujo import tiktoken
 
 class Interface:
 
-    def __init__(self, model_class: type, model_config: dict, tokenizer: type):
+    def __init__(self, model_class: type, model_config: dict, tokenizer: tiktoken.Encoding, file_path=''):
         self.model = model_class(model_config)
         self.tokenizer = tokenizer
 
@@ -28,9 +28,13 @@ class Interface:
         self.drop_rate:float = model_config.get('drop_rate')
         self.qkv_bias:bool = model_config.get('qkv_bias')
 
-        self.device = "cpu"
         if torch.cuda.is_available():
-            self.device = "cuda"
+            self.device = torch.device('cuda')
+        else:
+            self.device = torch.device('cpu')
+
+        if file_path:
+            self.load_model(file_path)
 
     def load_model(self, file_path:str):
         self.model.load_state_dict(torch.load(file_path, map_location=self.device))
@@ -55,10 +59,12 @@ class Interface:
             print('-' * 40)
 
     def text_to_tokens(self, text: str):
+        self.model.to(self.device)
         encoded = self.tokenizer.encode(text, allowed_special={'<|endoftext|>'})
         return torch.tensor(encoded).unsqueeze(0)
 
     def tokens_to_text(self, tokens: torch.Tensor):
+        self.model.to(self.device)
         flat = tokens.squeeze(0)
         return self.tokenizer.decode(flat.tolist())
 
@@ -97,3 +103,4 @@ class Interface:
 
             tokens = torch.cat((tokens, next_tokens), dim=1)
         return self.tokens_to_text(tokens)
+
