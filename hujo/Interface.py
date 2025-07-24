@@ -12,11 +12,13 @@
 
 from hujo import torch
 from hujo import tiktoken
+from hujo import utils
+
 
 class Interface:
 
-    def __init__(self, model_class: type, model_config: dict, tokenizer: tiktoken.Encoding, file_path=''):
-        self.model = model_class(model_config)
+    def __init__(self, model_class: type, model_config: dict, tokenizer: tiktoken.Encoding, device, file_path=''):
+        self.model = model_class(model_config, device)
         self.tokenizer = tokenizer
 
         self.config = model_config
@@ -28,10 +30,8 @@ class Interface:
         self.drop_rate:float = model_config.get('drop_rate')
         self.qkv_bias:bool = model_config.get('qkv_bias')
 
-        if torch.cuda.is_available():
-            self.device = torch.device('cuda')
-        else:
-            self.device = torch.device('cpu')
+        self.device = utils.get_torch_device()
+        self.model.cuda()
 
         if file_path:
             self.load_model(file_path)
@@ -46,40 +46,40 @@ class Interface:
         torch.save(self.model.state_dict(), file_path)
         print(f"Model State Saved to: {file_path}")
 
-    def chat(self, max_new_tokens:int=10, ):
+    def chat(self, max_new_tokens:int=10):
         self.model.eval()
         while usr_input := str(input(":> ")):
-            response = self.generate_text_advanced(
-                usr_input,
+            tokens = self.text_to_tokens(usr_input)
+            tokens = self.generate_text_advanced(
+                self.model,
+                tokens,
                 max_new_tokens=max_new_tokens,
                 temp=1.5,
                 top_k=15
             )
-            print(response)
+            print(self.text_to_tokens(tokens))
             print('-' * 40)
 
     def text_to_tokens(self, text: str):
-        self.model.to(self.device)
         encoded = self.tokenizer.encode(text, allowed_special={'<|endoftext|>'})
         return torch.tensor(encoded).unsqueeze(0)
 
     def tokens_to_text(self, tokens: torch.Tensor):
-        self.model.to(self.device)
         flat = tokens.squeeze(0)
         return self.tokenizer.decode(flat.tolist())
 
-    def generate_text_advanced(self, text:str, max_new_tokens:int, temp:float=0.0, top_k:int=None, eos_id:str=None):
+    # TODO: Unscrew this function. It is the cause of the 'many device' issue. OPE
+    def generate_text_advanced(self, model, tokens, max_new_tokens:int, temp:float=0.0, top_k:int=None, eos_id:str=None):
         """
             This function adds temperature scaling and top-k sampling into the text generation. This looks like it also
             includes the multinomial text generation methods as well
         """
-
-        tokens = self.text_to_tokens(text)
+        model.cuda()
 
         for _ in range(max_new_tokens):
-            tokens_crop = tokens[:, -(self.context_size):]
+            tokens_crop = tokens[:, -self.context_size:]
             with torch.no_grad():
-                logits: torch.Tensor = self.model(tokens_crop)
+                logits: torch.Tensor = model(tokens_crop)
             logits = logits[:, -1, :]
 
             if top_k:
@@ -102,5 +102,5 @@ class Interface:
                 break
 
             tokens = torch.cat((tokens, next_tokens), dim=1)
-        return self.tokens_to_text(tokens)
+        return tokens
 

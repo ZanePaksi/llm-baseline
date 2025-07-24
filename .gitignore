@@ -2,6 +2,7 @@
 __pycache__/
 
 *.pth
+data/
 
 # Distribution / packaging
 .Python

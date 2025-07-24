@@ -1,18 +1,20 @@
 from hujo import torch
-
+from hujo import utils
 
 class GPTModel(torch.nn.Module):
 
-    def __init__(self, config: dict):
+    def __init__(self, config: dict, device):
         super().__init__()
         # torch.Embedding is a lookup table that stores embeddings of a fixed dictionary size
-        self.token_embedding_lookup: torch.Embedding = torch.nn.Embedding(config['vocab_size'], config['emb_dim'])
-        self.positional_embedding_lookup: torch.Embedding = torch.nn.Embedding(config['context_size'], config['emb_dim'])
+        self.token_embedding_lookup: torch.Embedding = torch.nn.Embedding(config['vocab_size'], config['emb_dim'], device=device)
+        self.positional_embedding_lookup: torch.Embedding = torch.nn.Embedding(config['context_size'], config['emb_dim'], device=device)
         self.dropout: torch.Dropout = torch.nn.Dropout(config['drop_rate'])
 
         self.transformer_blocks: torch.Sequential = torch.nn.Sequential(*[TransformerBlock(config) for _ in range(config['n_layers'])])
         self.final_norm: LayerNorm = LayerNorm(config['emb_dim'])
         self.out_head: torch.Linear = torch.nn.Linear(config['emb_dim'], config['vocab_size'], bias=False)
+
+        self.device = utils.get_torch_device()
 
     def forward(self, token_ids: torch.Tensor):
         batch_size, seq_len = token_ids.shape

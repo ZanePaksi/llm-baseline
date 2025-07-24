@@ -1,11 +1,12 @@
 from hujo.Interface import Interface
 from hujo import tiktoken
 from hujo import torch
+from hujo import utils
 
 class Trainer(Interface):
 
-    def __init__(self, model_class: type, model_config: dict, tokenizer: tiktoken.Encoding, trainer_config: dict, file_path=''):
-        super().__init__(model_class, model_config, tokenizer)
+    def __init__(self, model_class: type, model_config: dict, tokenizer: tiktoken.Encoding, device, trainer_config: dict, file_path=''):
+        super().__init__(model_class, model_config, tokenizer, device)
 
         self.train_ratio = trainer_config.get('train_ratio')
         self.batch_size = trainer_config.get('batch_size')
@@ -15,6 +16,8 @@ class Trainer(Interface):
         self.start_context = trainer_config.get('start_context')
 
         self.optimizer = None
+
+        print(self.model.device)
 
     def calc_loss_loader(self, data_loader, num_batches=None):
         total_loss = 0.
@@ -94,13 +97,10 @@ class Trainer(Interface):
         train_loader = self.create_data_loader(train_data)
         val_loader = self.create_data_loader(val_data)
 
-        self.model.to(self.device)
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=0.0004, weight_decay=0.1)
-
         self.train_model_simple(train_loader, val_loader)
 
     def create_data_loader(self, text, shuffle=True, drop_last=True, num_workers=0):
-
         data_set = GPTDatasetV1(text, self.tokenizer, self.context_size, self.context_size // 2)
 
         data_loader = torch.utils.data.DataLoader(
@@ -111,6 +111,13 @@ class Trainer(Interface):
             num_workers=num_workers
         )
         return data_loader
+
+    def decoding_strategies(self):
+        self.model.eval()
+
+        text = self.generate_text_advanced("Every effort moves you", 25, 1.4, 20)
+
+        print("Output text:\n", text)
 
 # TODO: This can maybe get optimized. Need to explore training methodologies and dataset prep.
 class GPTDatasetV1(torch.utils.data.Dataset):
